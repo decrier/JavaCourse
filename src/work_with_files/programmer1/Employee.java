@@ -3,10 +3,11 @@ package work_with_files.programmer1;
 import java.io.Serializable;
 
 public class Employee implements Serializable {
+    static final long serialVersionUID = 1;
     String name;
     String department;
     int age;
-    double salary;
+    transient double salary; // !!!! информация поля, помеченная словом transient, не сериализуется
     Car car;
 
     public Employee(String name, String department, int age, double salary, Car car) {
