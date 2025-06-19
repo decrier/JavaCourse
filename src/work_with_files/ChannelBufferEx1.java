@@ -28,6 +28,9 @@ public class ChannelBufferEx1 {
 
             String text = "\nThere are only two ways to live your life.";
 
+            ByteBuffer buffer2 = ByteBuffer.wrap(text.getBytes());
+            channel.write(buffer2);
+
 //            ByteBuffer buffer2 = ByteBuffer.allocate(text.getBytes().length);
 //            buffer2.put(text.getBytes());
 //            buffer2.flip();
