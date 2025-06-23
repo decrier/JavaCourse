@@ -10,7 +10,7 @@ import java.util.Map;
 public class PathAndFilesEx1 {
     public static void main(String[] args) throws IOException {
         Path filePath = Paths.get("test15.txt");
-        Path directoryPath = Paths.get("C:\\Users\\Papa Kolya\\Desktop\\M");
+        Path directoryPath = Paths.get("C:\\Users\\mhavrysh\\Desktop\\M");
 
         System.out.println("filePath.getFileName() " + filePath.getFileName());
         System.out.println("directoryPath.getFileName() " + directoryPath.getFileName());
@@ -39,7 +39,7 @@ public class PathAndFilesEx1 {
         System.out.println("directoryPath.resolve(filePath) " + directoryPath.resolve(filePath));
         System.out.println("---------------------------------");
 
-        Path anotherPath = Paths.get("C:\\Users\\Papa Kolya\\Desktop\\M\\N\\Z\\test2.txt");
+        Path anotherPath = Paths.get("C:\\Users\\mhavrysh\\Desktop\\M\\N\\Z\\test2.txt");
         System.out.println("directoryPath.relativize(anotherPath) " + directoryPath.relativize(anotherPath));
         System.out.println("---------------------------------");
 
@@ -55,7 +55,7 @@ public class PathAndFilesEx1 {
         System.out.println("Files.isExecutable(filePath) " + Files.isExecutable(filePath));
         System.out.println("---------------------------------");
 
-        Path filePath2 = Paths.get("C:\\Users\\Papa Kolya\\IdeaProjects\\JavaCourse\\test15.txt");
+        Path filePath2 = Paths.get("C:\\Users\\mhavrysh\\IdeaProjects\\JavaCourse\\test15.txt");
         System.out.println("Files.isSameFile(filePath, filePath2) " + Files.isSameFile(filePath, filePath2));
         System.out.println("---------------------------------");
 
