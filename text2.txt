@@ -38,9 +38,9 @@ $(function () {
             },
             HINTS: {
                 HITNUMMER_HINT: `
-                    <p>Bitte geben Sie hier die HIT-Registriernummer Ihres Betriebes an, sofern diese nicht voreingeblendet ist. 
+                    <p>Bitte geben Sie hier die HIT-Registriernummer Ihres Betriebes an, sofern diese nicht voreingeblendet ist.
                     Die einzelnen Nummern der Betriebsstätten sind nicht zu erfassen.</p>
-                    <p>Sofern Sie Tiere haben, die während des Haltungszeitraums auf Pensionsbetrieben gehalten werden, geben 
+                    <p>Sofern Sie Tiere haben, die während des Haltungszeitraums auf Pensionsbetrieben gehalten werden, geben
                     Sie die HIT-Registriernummer des Pensionsbetriebes bitte zusätzlich kommasepariert bei der entsprechenden Ohrmarke an.</p>
                 `,
                 OHRMARKENNUMMER_HINT: `
@@ -50,7 +50,7 @@ $(function () {
                     <p>- 8 Ziffern (individuell)</p>
                     <p>Beispiel: Eine Ohrmarke mit der Nummer 2760912345678 wäre eine deutsche Ohrmarke aus dem Bundesland Thüringen (09) mit der individuellen Nummer 12345678.</p>
                 `,
-                
+
             }
         };
 
@@ -153,18 +153,26 @@ $(function () {
                 let isOhrmarkeGueltig = ohrmarkePattern.test(ohrmarke);
                 let isOhrmarkeEmpty = typeof ohrmarke === "string" && ohrmarke.trim() === "";
 
+                // --------------------
+                let hasOhrmarkeDuplicate = Object.values(ohrmarkenData).includes(ohrmarke, 1);
+                console.log(hasOhrmarkeDuplicate);
+
                 let isHitnummerGueltig = typeof hitnummer === "string" && hitnummer.split(",").every((nummer) => hitnummerPattern.test(nummer));
                 let isHitnummerEmpty = typeof hitnummer === "string" && hitnummer.trim() === "";
                 let isBeantragtEmpty = typeof beantragt === "string" && beantragt.trim() === "";
 
-                if ((!isOhrmarkeEmpty && !isOhrmarkeGueltig) || (beantragt && isOhrmarkeEmpty)) {
+                if ((!isOhrmarkeEmpty && !isOhrmarkeGueltig) || (beantragt && isOhrmarkeEmpty || (!isOhrmarkeEmpty && hasOhrmarkeDuplicate))) {
                     anyError = true;
                     const zelle = $(table.rows[i]).find("[data-x=" + ohrmarkenColumn + "]");
                     zelle.addClass("berechnungstabelle-error");
-        
+
                     if (!isOhrmarkeGueltig) {
                         zelle.attr("title", "Die eingegebene Ohrmarkennummer entspricht dem deutschen Format nicht.");
-                        // added 2 lines
+                        zelle.removeClass("berechnungstabelle-error");
+                        zelle.css("background-color", "yellow");
+                    }
+                    if (hasOhrmarkeDuplicate) {
+                        zelle.attr("title", "Der eingegebene Ohrmarkennummer ist bereits in der Tabelle vorhanden.");
                         zelle.removeClass("berechnungstabelle-error");
                         zelle.css("background-color", "yellow");
                     }
@@ -172,15 +180,15 @@ $(function () {
                         zelle.attr("title", "Bitte geben Sie eine Ohrmarkennummer an.");
                     }
                 } else {
-                    // added css
                     $(table.rows[i]).find("[data-x=" + ohrmarkenColumn + "]").attr("title", "").css("background-color", "");
                 }
+
 
                 if ((!isHitnummerEmpty && !isHitnummerGueltig) || (beantragt && isHitnummerEmpty)) {
                     anyError = true;
                     const zelle = $(table.rows[i]).find("[data-x=" + hitnummerColumn + "]");
                     zelle.addClass("berechnungstabelle-error");
-        
+
                     if (!isHitnummerGueltig) {
                         zelle.attr("title", "Sie haben eine ungültige HIT-Registriernummer angegeben.")
                     }
@@ -199,7 +207,7 @@ $(function () {
                 if (!isOhrmarkeEmpty && isBeantragtEmpty) {
                     anyError = true;
                     $(table.rows[i]).find("[data-x=" + beantragtColumn + "]").addClass("berechnungstabelle-error").attr("title", "Bitte geben Sie eine Beantragungsart an.");
-                } 
+                }
             }
 
             if (anyError) {
