@@ -7,12 +7,14 @@ $(function () {
 
         let obj = {};
 
+        obj.allowManualInsertRow = false;
         obj.tableId = tableId;
         obj.tableSelector = "[data-name=MUTTERKUEHETABLE]";
         obj.minRows = 3;
         obj.columnSorting = true;
         obj.search = true;
         obj.text = {search:"Suchen"};
+        obj.tableHeight = '50rem';
 
         let LISTS = {
             NACHWEISKALBUNG_SOURCE(el, x, y, table) {
@@ -24,6 +26,7 @@ $(function () {
             },
             BEANTRAGUNGSART_SOURCE() {
                 return [
+                    {id: "nicht_beantragt", name: "Nicht Beantragt"},
                     {id: "beantragt", name: "Beantragt"},
                     {id: "ersatzstier", name: "Ersatztier"},
                 ];
@@ -50,16 +53,15 @@ $(function () {
                     <p>- 8 Ziffern (individuell)</p>
                     <p>Beispiel: Eine Ohrmarke mit der Nummer 2760912345678 wäre eine deutsche Ohrmarke aus dem Bundesland Thüringen (09) mit der individuellen Nummer 12345678.</p>
                 `,
-
             }
         };
 
         obj.columns = [
             {name: "NUMMER",            title: "Nr.",               type: "integer", rowNumber: true, readOnly: true, ignoreForSpareRow: true, width: 50},
-            /*{name: "OHRMARKENNUMMER",   title: "Ohrmarkennummer",   type: "text", placeholder: "DE0662641857", trimFunction: formTableComponent.trim, width: 130},*/
+            //{name: "OHRMARKENNUMMER",   title: "Ohrmarkennummer",   type: "text", stripHTML: true, placeholder: "DE0662641857", trimFunction: formTableComponent.trim, width: 130},
             {name: "OHRMARKENNUMMER",   title: "Ohrmarkennummer",   type: "text", placeholder: "DE0662641857", trimFunction: formTableComponent.trim, hint: LISTS.HINTS.OHRMARKENNUMMER_HINT,width: 130},
             {name: "NACHWEISKALBUNG",   title: "Nachweis Kalbung",  type: "dropdown", source: LISTS.NACHWEISKALBUNG_SOURCE, readOnly: true, width: 130},
-            {name: "HITNUMMER",         title: "HIT-Registriernummer(n) im Haltungszeitraum", type: "text", placeholder: "061234567899", trimFunction: formTableComponent.trimCsv, hint: LISTS.HINTS.HITNUMMER_HINT, width: 150},
+            {name: "HITNUMMER",         title: "HIT-Registriernummer(n) im Haltungszeitraum", type: "text", stripHTML: true, placeholder: "061234567899", trimFunction: formTableComponent.trimCsv, hint: LISTS.HINTS.HITNUMMER_HINT, width: 150},
             {name: "BEANTRAGUNGSART",   title: "Beantragungsart",   type: "dropdown", source: LISTS.BEANTRAGUNGSART_SOURCE, width: 110},
             {name: "AENDERUNGSGRUND",   title: "Änderungsgrund",    type: "dropdown", source: LISTS.AENDERUNGSART_SOURCE, readOnly: formTableComponent.isErstantrag(), width: 150},
             {name: "BUTTONS",           title: "Aktion",            type: "text", rowNumber: true, readOnly: true, width: 75},
@@ -71,16 +73,21 @@ $(function () {
         ];
 
         obj.onload = function (el, table) {
+            let aenderungsgrundColumn = table.getColumnIndex("AENDERUNGSGRUND");
             let vorbelegtColumn = table.getColumnIndex("VORBELEGT");
             let abgegebenColumn = table.getColumnIndex("ABGEGEBEN");
+            let isSachbearbeiter = $("[id*='sachbearbeiter']").text() === 'true';
+            let gaAntragsphase = $("[id*='gaAntragsphase']").text() === 'REGULAERE_ANTRAGSPHASE';
             for (let i = 0; i < table.getData().length; i++) {
                 let row = table.getData()[i];
                 let readOnlyColumns = {};
+                let aenderungsgrund = row[aenderungsgrundColumn];
                 let vorbelegt = row[vorbelegtColumn] === true || row[vorbelegtColumn] === "true";
                 let abgegeben = row[abgegebenColumn] === true || row[abgegebenColumn] === "true";
-                readOnlyColumns.OHRMARKENNUMMER = !vorbelegt && !abgegeben;
-                readOnlyColumns.HITNUMMER = !abgegeben;
-                readOnlyColumns.BEANTRAGUNGSART = !abgegeben;
+                let editable= !abgegeben || gaAntragsphase || isSachbearbeiter;
+                readOnlyColumns.OHRMARKENNUMMER = !vorbelegt && editable;
+                readOnlyColumns.HITNUMMER = editable || aenderungsgrund === "2";
+                readOnlyColumns.BEANTRAGUNGSART = editable;
                 table.setCellsEditableByJSON(i, readOnlyColumns);
             }
 
@@ -98,6 +105,21 @@ $(function () {
     let callbacks = (function () {
 
         let obj = {};
+
+        obj.onchangecell = function (args) {
+            const { table, columnName, newValue, index } = args;
+            let row = table.getData()[index];
+            if (columnName === "AENDERUNGSGRUND") {
+                let readOnlyColumns = {};
+                let isSachbearbeiter = $("[id*='sachbearbeiter']").text() === 'true';
+                let gaAntragsphase = $("[id*='gaAntragsphase']").text() === 'REGULAERE_ANTRAGSPHASE';
+                let abgegebenColumn = table.getColumnIndex("ABGEGEBEN");
+                let abgegeben = row[abgegebenColumn] === true || row[abgegebenColumn] === "true";
+                let editable= !abgegeben || gaAntragsphase || isSachbearbeiter;
+                readOnlyColumns.HITNUMMER = editable || newValue === "2";
+                table.setCellsEditableByJSON(index, readOnlyColumns);
+            }
+        }
 
         obj.updateBeantragteTiereCount = function (args) {
             let { table } = args;
@@ -140,11 +162,25 @@ $(function () {
             let hitnummerColumn = table.getColumnIndex("HITNUMMER");
             let hitnummerData = table.getColumnDataByName("HITNUMMER");
 
+            let abgegebenColumn = table.getColumnIndex("ABGEGEBEN");
+            let abgegebenData = table.getColumnDataByName("ABGEGEBEN");
+
+            let ohrmarkenDoppelt = {};
+            for (let i = 0; i < ohrmarkenData.length; i++) {
+                let ohrmarke = ohrmarkenData[i];
+                ohrmarkenDoppelt[ohrmarke] = ohrmarkenDoppelt.hasOwnProperty(ohrmarke);
+            }
+
+            // String mit dem Hinweis über das falsche Ohrmarkennummerformat
+            const ohrMarkenHinweis = 'Die eingegebene Ohrmarkennummer entspricht nicht dem deutschen Format.';
+
             $(table.rows).find(".berechnungstabelle-error").removeClass("berechnungstabelle-error");
+            $(table.rows).find("[title]").attr("title", null);
             for (let i = 0; i < ohrmarkenData.length; i++) {
                 let ohrmarke = ohrmarkenData[i];
                 let hitnummer = hitnummerData[i];
                 let beantragt = beantragtData[i];
+                let abgegeben = String(abgegebenData[i]) === "true";
 
                 //let ohrmarkePattern = /^([A-Za-z]{2})([0-9]{2})([0-9]{3})([0-9]{5})$/;
                 let ohrmarkePattern = /^(DE|276)([01])([0-9])([0-9]{3})([0-9]{5})$/;
@@ -153,61 +189,61 @@ $(function () {
                 let isOhrmarkeGueltig = ohrmarkePattern.test(ohrmarke);
                 let isOhrmarkeEmpty = typeof ohrmarke === "string" && ohrmarke.trim() === "";
 
-                // --------------------
-                let hasOhrmarkeDuplicate = Object.values(ohrmarkenData).includes(ohrmarke, 1);
-                console.log(hasOhrmarkeDuplicate);
+                //------------gelben Hintergrund für die Zelle festlegen-----------------------
+                let $zelle = $(table.rows[i]).find("[data-x=" + ohrmarkenColumn + "]");
+                if (!isOhrmarkeEmpty && !isOhrmarkeGueltig) {
+                    $zelle[0].style.setProperty("background-color", "yellow", "important");
+                } else {
+                    $zelle[0].style.setProperty("background-color", "", "important");
+                }
 
                 let isHitnummerGueltig = typeof hitnummer === "string" && hitnummer.split(",").every((nummer) => hitnummerPattern.test(nummer));
                 let isHitnummerEmpty = typeof hitnummer === "string" && hitnummer.trim() === "";
                 let isBeantragtEmpty = typeof beantragt === "string" && beantragt.trim() === "";
 
-                if ((!isOhrmarkeEmpty && !isOhrmarkeGueltig) || (beantragt && isOhrmarkeEmpty || (!isOhrmarkeEmpty && hasOhrmarkeDuplicate))) {
-                    anyError = true;
-                    const zelle = $(table.rows[i]).find("[data-x=" + ohrmarkenColumn + "]");
-                    zelle.addClass("berechnungstabelle-error");
+                let activePlausis = {};
 
+                if ((!isOhrmarkeEmpty && !isOhrmarkeGueltig) || (beantragt && isOhrmarkeEmpty)) {
                     if (!isOhrmarkeGueltig) {
-                        zelle.attr("title", "Die eingegebene Ohrmarkennummer entspricht dem deutschen Format nicht.");
-                        zelle.removeClass("berechnungstabelle-error");
-                        zelle.css("background-color", "yellow");
-                    }
-                    if (hasOhrmarkeDuplicate) {
-                        zelle.attr("title", "Der eingegebene Ohrmarkennummer ist bereits in der Tabelle vorhanden.");
-                        zelle.removeClass("berechnungstabelle-error");
-                        zelle.css("background-color", "yellow");
+                        activePlausis[ohrmarkenColumn] = ohrMarkenHinweis;
                     }
                     if (isOhrmarkeEmpty) {
-                        zelle.attr("title", "Bitte geben Sie eine Ohrmarkennummer an.");
+                        activePlausis[ohrmarkenColumn] = "Bitte geben Sie eine Ohrmarkennummer an.";
                     }
-                } else {
-                    $(table.rows[i]).find("[data-x=" + ohrmarkenColumn + "]").attr("title", "").css("background-color", "");
                 }
 
+                if (!isOhrmarkeEmpty && !abgegeben && ohrmarkenDoppelt[ohrmarke]) {
+                    activePlausis[ohrmarkenColumn] = "Sie haben eine Ohrmarke doppelt erfasst. Bitte korrigieren Sie ihre Angabe.";
+                }
 
                 if ((!isHitnummerEmpty && !isHitnummerGueltig) || (beantragt && isHitnummerEmpty)) {
-                    anyError = true;
-                    const zelle = $(table.rows[i]).find("[data-x=" + hitnummerColumn + "]");
-                    zelle.addClass("berechnungstabelle-error");
-
                     if (!isHitnummerGueltig) {
-                        zelle.attr("title", "Sie haben eine ungültige HIT-Registriernummer angegeben.")
+                        activePlausis[hitnummerColumn] = "Sie haben eine ungültige HIT-Registriernummer angegeben.";
                     }
                     if (isHitnummerEmpty) {
-                        zelle.attr("title", "Bitte geben Sie eine HIT-Registriernummer an.");
+                        activePlausis[hitnummerColumn] = "Bitte geben Sie eine HIT-Registriernummer an.";
                     }
-                } else {
-                    $(table.rows[i]).find("[data-x=" + hitnummerColumn + "]").attr("title", "");
                 }
 
                 if (!isOhrmarkeEmpty && isHitnummerEmpty) {
-                    anyError = true;
-                    $(table.rows[i]).find("[data-x=" + hitnummerColumn + "]").addClass("berechnungstabelle-error").attr("title", "Bitte geben Sie eine HIT-Registriernummer an.");
+                    activePlausis[hitnummerColumn] = "Bitte geben Sie eine HIT-Registriernummer an.";
                 }
 
                 if (!isOhrmarkeEmpty && isBeantragtEmpty) {
-                    anyError = true;
-                    $(table.rows[i]).find("[data-x=" + beantragtColumn + "]").addClass("berechnungstabelle-error").attr("title", "Bitte geben Sie eine Beantragungsart an.");
+                    activePlausis[beantragtColumn] = "Bitte geben Sie eine Beantragungsart an.";
                 }
+
+                // l
+                if (Object.values(activePlausis).length > 1 ||
+                        (Object.values(activePlausis).length === 1 && Object.values(activePlausis)[0] !== ohrMarkenHinweis)) {
+                    anyError = true;
+                    for (let j = 0; j < table.options.columns.length; j++) {
+                        if (activePlausis.hasOwnProperty(j)) {
+                            $(table.rows[i]).find("[data-x=" + j + "]").addClass("berechnungstabelle-error").attr("title", activePlausis[j]);
+                        }
+                    }
+                }
+
             }
 
             if (anyError) {
@@ -215,9 +251,10 @@ $(function () {
             } else {
                 tableElement.error("");
             }
-        }
 
+        }
         window["mutterkuehe"]["errorFunction"] = obj.errorFunction;
+
         obj.onaddtable = function (args) {
             let { table } = args;
             initNummer(table);
